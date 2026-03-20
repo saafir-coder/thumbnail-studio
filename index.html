@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thumbnail Studio — Inner-Sizze</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: #1a1a1a;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 1px solid #333;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #c8ff00;
+            white-space: nowrap;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 600px;
+            display: flex;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px 16px;
+            background: #222;
+            border: 1px solid #444;
+            border-right: none;
+            border-radius: 20px 0 0 20px;
+            color: white;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .search-box input:focus { border-color: #c8ff00; }
+
+        .search-box button {
+            padding: 10px 20px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 0 20px 20px 0;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .search-box button:hover { background: #444; }
+
+        .result-count {
+            color: #888;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+            padding: 24px;
+        }
+
+        .card {
+            cursor: pointer;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #1a1a1a;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(200,255,0,0.1); }
+        .card.selected { outline: 3px solid #c8ff00; outline-offset: -3px; }
+
+        .card img {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-info { padding: 10px 12px; }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-channel { font-size: 12px; color: #888; }
+
+        /* ===== STUDIO PANEL ===== */
+        .studio-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #141414;
+            border-top: 2px solid #c8ff00;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 200;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        .studio-panel.open { transform: translateY(0); }
+
+        .studio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px 0;
+        }
+
+        .studio-header h2 {
+            font-size: 18px;
+            color: #c8ff00;
+        }
+
+        .close-btn {
+            background: none;
+            border: 1px solid #444;
+            color: #888;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .close-btn:hover { border-color: #c8ff00; color: #c8ff00; }
+
+        .studio-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 16px 24px 24px;
+        }
+
+        /* Left: Reference + Your Face */
+        .studio-left {}
+
+        .compare-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .compare-box {
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .compare-box img {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+            display: block;
+        }
+
+        .compare-label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.75);
+            color: #c8ff00;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .face-upload {
+            border: 2px dashed #444;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 16/9;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .face-upload:hover { border-color: #c8ff00; }
+        .face-upload.has-image { border-style: solid; border-color: #c8ff00; }
+
+        .face-upload .upload-text {
+            color: #666;
+            font-size: 13px;
+            text-align: center;
+            padding: 8px;
+        }
+
+        .face-upload .upload-text strong {
+            color: #c8ff00;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .face-upload img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .ref-meta {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .ref-meta strong { color: #e0e0e0; }
+
+        .ref-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Right: Style Controls + Prompt */
+        .studio-right {}
+
+        .style-section {
+            margin-bottom: 16px;
+        }
+
+        .style-section label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .style-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .style-option {
+            padding: 8px 12px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #ccc;
+            text-align: center;
+            transition: all 0.15s;
+        }
+
+        .style-option:hover { border-color: #666; }
+        .style-option.active { border-color: #c8ff00; color: #c8ff00; background: #1a2000; }
+
+        select.style-select {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 13px;
+            outline: none;
+        }
+
+        select.style-select:focus { border-color: #c8ff00; }
+
+        .soul-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .soul-toggle input[type="checkbox"] {
+            accent-color: #c8ff00;
+            width: 18px;
+            height: 18px;
+        }
+
+        .soul-toggle span { font-size: 13px; }
+        .soul-toggle .soul-hint { font-size: 11px; color: #666; }
+
+        .glasses-badge {
+            display: inline-block;
+            background: #2a1a00;
+            border: 1px solid #c8ff00;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 11px;
+            color: #c8ff00;
+            margin-left: 6px;
+        }
+
+        .prompt-box {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #ddd;
+            white-space: pre-wrap;
+            min-height: 120px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .prompt-box .pillar-tag {
+            color: #c8ff00;
+            font-weight: 600;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-primary { background: #c8ff00; color: #000; }
+        .btn-primary:hover { background: #b5e600; }
+
+        .btn-secondary { background: #2a2a2a; color: #fff; border: 1px solid #444; }
+        .btn-secondary:hover { background: #333; }
+
+        .btn-accent { background: #6C3AED; color: #fff; }
+        .btn-accent:hover { background: #5B21B6; }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #333;
+            border-top-color: #c8ff00;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty {
+            text-align: center;
+            padding: 80px 24px;
+            color: #555;
+        }
+
+        .empty h2 { font-size: 24px; margin-bottom: 8px; color: #777; }
+        .empty p { font-size: 15px; }
+
+        .tag-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 24px;
+            overflow-x: auto;
+            background: #1a1a1a;
+        }
+
+        .tag {
+            padding: 6px 14px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+            color: #ccc;
+        }
+
+        .tag:hover { background: #333; border-color: #c8ff00; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .studio-body { grid-template-columns: 1fr; }
+            .compare-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">Thumbnail Studio</div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search YouTube thumbnails... (e.g. AI agents, Claude Code, automation)" autofocus>
+        <button onclick="searchYouTube()">Search</button>
+    </div>
+    <div class="result-count" id="resultCount"></div>
+</div>
+
+<div class="tag-bar">
+    <div class="tag" onclick="quickSearch('AI agents tutorial')">AI Agents</div>
+    <div class="tag" onclick="quickSearch('Claude Code')">Claude Code</div>
+    <div class="tag" onclick="quickSearch('n8n automation')">n8n</div>
+    <div class="tag" onclick="quickSearch('AI video generation')">AI Video</div>
+    <div class="tag" onclick="quickSearch('Higgsfield AI')">Higgsfield</div>
+    <div class="tag" onclick="quickSearch('MrBeast')">MrBeast Style</div>
+    <div class="tag" onclick="quickSearch('tech thumbnail design')">Tech Thumbnails</div>
+    <div class="tag" onclick="quickSearch('AI automation agency')">AI Agency</div>
+    <div class="tag" onclick="quickSearch('agent to agent protocol')">A2A Protocol</div>
+</div>
+
+<div id="content">
+    <div class="empty">
+        <h2>Search for thumbnail inspiration</h2>
+        <p>Find a thumbnail style you like → Generate character in Higgsfield → Merge with Nano Banana</p>
+    </div>
+</div>
+
+<!-- ===== STUDIO PANEL ===== -->
+<div class="studio-panel" id="studioPanel">
+    <div class="studio-header">
+        <h2 style="margin-right:20px;">Thumbnail Studio</h2>
+        <div style="display:flex;gap:4px;">
+            <button id="tabPrimary" onclick="switchStudioTab('primary')"
+                style="padding:8px 24px;border-radius:8px 8px 0 0;border:2px solid #c8ff00;border-bottom:none;background:#c8ff00;color:#000;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
+                Primary
+            </button>
+            <button id="tabAB" onclick="switchStudioTab('ab')"
+                style="padding:8px 24px;border-radius:8px 8px 0 0;border:2px solid #444;border-bottom:none;background:#1a1a1a;color:#666;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
+                A/B Test
+            </button>
+        </div>
+        <button class="close-btn" onclick="closeStudio()">Close</button>
+    </div>
+
+    <div class="studio-body">
+        <!-- LEFT: Reference + Face -->
+        <div class="studio-left">
+            <div class="compare-row">
+                <div class="compare-box" id="refBox">
+                    <span class="compare-label">Reference</span>
+                    <img id="refImage" src="" alt="Reference thumbnail">
+                </div>
+                <div class="compare-box">
+                    <span class="compare-label">Your Face (optional)</span>
+                    <div class="face-upload" id="faceUpload" onclick="document.getElementById('faceInput').click()">
+                        <div class="upload-text" id="uploadText">
+                            <strong>Drop face photo here</strong>
+                            or click to upload<br>
+                            <span style="font-size:11px;color:#555">Used as visual reference for Higgsfield</span>
+                        </div>
+                    </div>
+                    <input type="file" id="faceInput" accept="image/*,.heic,.heif" style="display:none" onchange="handleFaceUpload(event)">
+                </div>
+            </div>
+
+            <div class="ref-meta" id="refMeta"></div>
+
+            <div class="soul-toggle">
+                <input type="checkbox" id="useSoulId" checked>
+                <div>
+                    <span>Use my Soul ID (character consistency)</span>
+                    <span class="glasses-badge">+ glasses</span><br>
+                    <span class="soul-hint">Your 59-photo trained character — always includes glasses</span>
+                </div>
+            </div>
+
+            <div class="ref-actions">
+                <button class="btn btn-secondary" onclick="downloadRef()">Download Reference</button>
+                <button class="btn btn-secondary" onclick="openOnYouTube()">View on YouTube</button>
+            </div>
+        </div>
+
+        <!-- RIGHT: Your Video + Style Controls + Prompt -->
+        <div class="studio-right">
+            <!-- SHARED: VIDEO TOPIC (visible in both tabs) -->
+            <div class="style-section" style="background:#1a2000;border:1px solid #c8ff00;border-radius:10px;padding:14px;">
+                <label style="color:#c8ff00">Your Video Topic</label>
+                <input type="text" id="videoTopic" placeholder="e.g. A2A Protocol, n8n automation, Claude Code..."
+                    style="width:100%;padding:10px 14px;background:#111;border:1px solid #444;border-radius:8px;color:white;font-size:14px;outline:none;margin-bottom:8px;"
+                    oninput="generatePrompt()" onfocus="this.style.borderColor='#c8ff00'" onblur="this.style.borderColor='#444'">
+                <div style="font-size:11px;color:#888;">Your topic — used in the Nano Banana merge prompt (Step 3).</div>
+            </div>
+
+            <!-- ===== PRIMARY PANEL ===== -->
+            <div id="panelPrimary">
+
+            <!-- ===== STEP 1: CHARACTER PROMPT (subject only) ===== -->
+            <div class="style-section" style="border:2px solid #c8ff00;border-radius:10px;padding:14px;background:#111;">
+                <label><span style="background:#c8ff00;color:#000;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:8px;">STEP 1</span> Character Prompt (Higgsfield Soul 2.0)</label>
+                <div style="font-size:11px;color:#888;margin-bottom:10px;">Describe ONLY the subject: pose, expression, angle, clothing. Higgsfield generates your character matching the reference person. No background needed.</div>
+
+                <div class="style-section">
+                    <label>Describe the Subject in Reference</label>
+                    <textarea id="subjectDescription" rows="2" placeholder="e.g. Guy on the right side, confident look, green shirt, leaning slightly forward, facing camera..."
+                        style="width:100%;padding:10px 14px;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#ccc;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+                        oninput="generatePrompt()" onfocus="this.style.borderColor='#c8ff00'" onblur="this.style.borderColor='#333'"></textarea>
+                    <div style="font-size:11px;color:#666;margin-top:4px;">What is the person doing? Their pose, expression, hand position, body angle.</div>
+                </div>
+
+                <div class="style-section">
+                    <label>Mood / Expression</label>
+                    <div class="style-grid" id="moodGrid">
+                        <div class="style-option active" data-val="focused and confident" onclick="pickStyle(this,'mood')">Focused</div>
+                        <div class="style-option" data-val="shocked and amazed, eyes wide" onclick="pickStyle(this,'mood')">Shocked</div>
+                        <div class="style-option" data-val="serious and intense, slight frown" onclick="pickStyle(this,'mood')">Intense</div>
+                        <div class="style-option" data-val="smiling warmly, approachable" onclick="pickStyle(this,'mood')">Friendly</div>
+                        <div class="style-option" data-val="curious, head slightly tilted" onclick="pickStyle(this,'mood')">Curious</div>
+                        <div class="style-option" data-val="powerful and commanding" onclick="pickStyle(this,'mood')">Powerful</div>
+                    </div>
+                </div>
+
+                <div class="style-section">
+                    <label>Higgsfield Style Preset</label>
+                    <select class="style-select" id="hfStyleSelect">
+                        <option value="1cb4b936-77bf-4f9a-9039-f3d349a4cdbe">Realistic — ultra-real portraits</option>
+                        <option value="811de7ab-7aaf-4a6b-b352-cdea6c34c8f1">Movie — film-grade cinematic</option>
+                        <option value="464ea177-8d40-4940-8d9d-b438bab269c7">General — clean balanced</option>
+                        <option value="40ff999c-f576-443c-b5b3-c7d1391a666e">Spotlight — high-contrast drama</option>
+                        <option value="f5c094c7-4671-4d86-90d2-369c8fdbd7a5">90s Grain — retro warmth</option>
+                        <option value="a13917c7-02a4-450f-b007-e72d53151980">Street View — urban photography</option>
+                        <option value="ca4e6ad3-3e93-4e03-81a0-d1722d2c128b">DigitalCam — raw 2007 aesthetic</option>
+                        <option value="0fe8ad66-ff61-411f-9186-b392e140b18c">Foggy Morning — moody dreamlike</option>
+                    </select>
+                </div>
+
+                <div class="prompt-box" id="promptOutput">Click a thumbnail to start...</div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="generatePrompt()">Generate Character Prompt</button>
+                    <button class="btn btn-accent" onclick="copyPrompt()">Copy</button>
+                    <button class="btn btn-secondary" onclick="copyWithMeta()">Copy + Settings</button>
+                    <button class="btn btn-secondary" onclick="regeneratePrompt()">Shuffle Pose</button>
+                </div>
+            </div>
+
+            <!-- ===== STEP 2: DOWNLOAD CHARACTER ===== -->
+            <div class="style-section" style="border:2px solid #6C3AED;border-radius:10px;padding:14px;background:#111;">
+                <label><span style="background:#6C3AED;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:8px;">STEP 2</span> Download Character from Higgsfield</label>
+                <div style="font-size:12px;color:#999;line-height:1.6;">
+                    1. Paste the character prompt into Higgsfield Soul 2.0<br>
+                    2. Select your Soul ID for face consistency<br>
+                    3. Generate — pick the best result<br>
+                    4. Download that character image
+                </div>
+                <div style="margin-top:10px;">
+                    <label style="font-size:11px;margin-bottom:4px;">Character Image (from Higgsfield)</label>
+                    <div class="face-upload" id="characterUpload" onclick="document.getElementById('characterInput').click()" style="aspect-ratio:16/9;border-color:#6C3AED;">
+                        <div class="upload-text" id="characterUploadText">
+                            <strong style="color:#6C3AED;">Drop character image here</strong>
+                            or click to upload<br>
+                            <span style="font-size:11px;color:#555">The image you generated in Higgsfield</span>
+                        </div>
+                    </div>
+                    <input type="file" id="characterInput" accept="image/*,.heic,.heif" style="display:none" onchange="handleCharacterUpload(event)">
+                </div>
+            </div>
+
+            <!-- ===== STEP 3: NANO BANANA MERGE ===== -->
+            <div class="style-section" style="border:2px solid #ff6b35;border-radius:10px;padding:14px;background:#111;">
+                <label><span style="background:#ff6b35;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:8px;">STEP 3</span> Nano Banana Merge (Gemini)</label>
+                <div style="font-size:11px;color:#888;margin-bottom:10px;">Feed Nano Banana: reference thumbnail + character image + this prompt. It recreates the full scene with your face.</div>
+
+                <div class="style-section">
+                    <label>Describe the Full Thumbnail Scene</label>
+                    <textarea id="sceneDescription" rows="3" placeholder="e.g. Dark background with glowing AI/tech icons (database, API, robot), neon connection lines, bold text 'EASIER THAN YOU THINK' at top..."
+                        style="width:100%;padding:10px 14px;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#ccc;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+                        oninput="generateMergePrompt()" onfocus="this.style.borderColor='#ff6b35'" onblur="this.style.borderColor='#333'"></textarea>
+                    <div style="font-size:11px;color:#666;margin-top:4px;">Describe everything EXCEPT the person: background, icons, text overlays, colors, lighting, mood.</div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="style-section">
+                        <label>Lighting</label>
+                        <select class="style-select" id="lightingSelect" onchange="generateMergePrompt()">
+                            <option value="cinematic rim lighting with blue-teal glow from monitors, warm amber key light">Tech Glow</option>
+                            <option value="dramatic side lighting with deep shadows, single motivated light source">Dramatic Side</option>
+                            <option value="golden hour warm light, soft diffused fill">Golden Hour</option>
+                            <option value="high-contrast spotlight from above, volumetric haze">Spotlight</option>
+                            <option value="neon-lit environment, pink and blue neon reflections">Neon Cyberpunk</option>
+                            <option value="soft natural light, even and flattering">Soft Natural</option>
+                            <option value="backlit silhouette edge light, face illuminated by screen glow">Backlit Screen</option>
+                        </select>
+                    </div>
+                    <div class="style-section">
+                        <label>Color Grade</label>
+                        <select class="style-select" id="colorSelect" onchange="generateMergePrompt()">
+                            <option value="teal and warm amber tones, cinematic grade">Teal + Amber</option>
+                            <option value="cool blue dominant, desaturated highlights">Cool Blue</option>
+                            <option value="warm golden tones with green accents">Warm Gold</option>
+                            <option value="high contrast with selective color pop">B&W + Pop</option>
+                            <option value="neon pink and electric blue, cyberpunk palette">Neon Pop</option>
+                            <option value="muted earth tones, film emulation">Muted Film</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="prompt-box" id="mergePromptOutput" style="border-color:#ff6b35;">Select a thumbnail and describe the scene...</div>
+                <div class="btn-row">
+                    <button class="btn" onclick="generateMergePrompt()" style="background:#ff6b35;color:#fff;">Generate Merge Prompt</button>
+                    <button class="btn" onclick="copyMergePrompt()" style="background:#ff6b35;color:#fff;">Copy Merge Prompt</button>
+                    <button class="btn btn-secondary" onclick="downloadRef()">Download Reference</button>
+                </div>
+            </div>
+
+            </div><!-- /panelPrimary -->
+
+            <!-- ===== A/B TEST PANEL ===== -->
+            <div id="panelAB" style="display:none;">
+                <p style="font-size:12px;color:#888;margin-bottom:16px;">Same 3-step process for each variation. Different pose, mood, scene, lighting — same quality. Upload all 3 to YouTube's A/B test.</p>
+
+                <!-- B / C SWITCHER -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;">
+                    <button class="btn" id="abTabB" onclick="switchABTab('B')" style="flex:1;background:#3b82f6;color:#fff;padding:10px;font-weight:700;border-radius:8px;">Variation B</button>
+                    <button class="btn" id="abTabC" onclick="switchABTab('C')" style="flex:1;background:#222;color:#888;padding:10px;font-weight:700;border:1px solid #333;border-radius:8px;">Variation C</button>
+                </div>
+
+                <!-- VARIATION B -->
+                <div id="abPanelB" style="display:block;">
+                    <!-- B Step 1 -->
+                    <div style="border:2px solid #3b82f6;border-radius:10px;padding:14px;background:#111;margin-bottom:12px;">
+                        <label style="font-size:13px;font-weight:700;color:#3b82f6;display:block;margin-bottom:8px;">
+                            <span style="background:#3b82f6;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:6px;">B1</span> Character Prompt (Higgsfield)
+                        </label>
+                        <textarea id="ab_b_subjectDesc" rows="2" placeholder="Describe the subject differently — different pose, angle, expression..."
+                            style="width:100%;padding:10px;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#ccc;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+                            oninput="generateABPrompt('B')" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#333'"></textarea>
+                        <div style="margin-top:8px;">
+                            <label style="font-size:11px;color:#3b82f6;">Mood</label>
+                            <div class="style-grid" id="ab_b_moodGrid" style="margin-top:4px;">
+                                <div class="style-option active" data-val="focused and confident" onclick="pickABStyle(this,'B')">Focused</div>
+                                <div class="style-option" data-val="shocked and amazed, eyes wide" onclick="pickABStyle(this,'B')">Shocked</div>
+                                <div class="style-option" data-val="serious and intense, slight frown" onclick="pickABStyle(this,'B')">Intense</div>
+                                <div class="style-option" data-val="smiling warmly, approachable" onclick="pickABStyle(this,'B')">Friendly</div>
+                                <div class="style-option" data-val="curious, head slightly tilted" onclick="pickABStyle(this,'B')">Curious</div>
+                                <div class="style-option" data-val="powerful and commanding" onclick="pickABStyle(this,'B')">Powerful</div>
+                            </div>
+                        </div>
+                        <div class="prompt-box" id="ab_b_step1Prompt" style="border-color:#3b82f6;margin-top:10px;">Set mood and describe subject...</div>
+                        <div class="btn-row" style="margin-top:8px;">
+                            <button class="btn" onclick="generateABPrompt('B')" style="background:#3b82f6;color:#fff;">Generate</button>
+                            <button class="btn" onclick="copyABPrompt('B','step1')" style="background:#3b82f6;color:#fff;">Copy</button>
+                            <button class="btn btn-secondary" onclick="shuffleABPose('B')">Shuffle Pose</button>
+                        </div>
+                    </div>
+                    <!-- B Step 2 -->
+                    <div style="border:2px solid #6C3AED;border-radius:10px;padding:14px;background:#111;margin-bottom:12px;">
+                        <label style="font-size:13px;font-weight:700;color:#6C3AED;display:block;margin-bottom:8px;">
+                            <span style="background:#6C3AED;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:6px;">B2</span> Download Character
+                        </label>
+                        <div class="face-upload" id="ab_b_charUpload" onclick="document.getElementById('ab_b_charInput').click()" style="aspect-ratio:16/9;border-color:#6C3AED;">
+                            <div class="upload-text"><strong style="color:#6C3AED;">Drop Variation B character here</strong><br><span style="font-size:11px;color:#555">Generated from B1 prompt in Higgsfield</span></div>
+                        </div>
+                        <input type="file" id="ab_b_charInput" accept="image/*,.heic,.heif" style="display:none" onchange="handleABCharUpload(event,'B')">
+                    </div>
+                    <!-- B Step 3 -->
+                    <div style="border:2px solid #ff6b35;border-radius:10px;padding:14px;background:#111;">
+                        <label style="font-size:13px;font-weight:700;color:#ff6b35;display:block;margin-bottom:8px;">
+                            <span style="background:#ff6b35;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:6px;">B3</span> Nano Banana Merge
+                        </label>
+                        <textarea id="ab_b_sceneDesc" rows="2" placeholder="Describe a DIFFERENT scene — different background, icons, text overlay, colors..."
+                            style="width:100%;padding:10px;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#ccc;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+                            oninput="generateABMerge('B')" onfocus="this.style.borderColor='#ff6b35'" onblur="this.style.borderColor='#333'"></textarea>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                            <div>
+                                <label style="font-size:11px;color:#ff6b35;">Lighting</label>
+                                <select class="style-select" id="ab_b_lighting" onchange="generateABMerge('B')">
+                                    <option value="cinematic rim lighting with blue-teal glow from monitors, warm amber key light">Tech Glow</option>
+                                    <option value="dramatic side lighting with deep shadows, single motivated light source">Dramatic Side</option>
+                                    <option value="golden hour warm light, soft diffused fill">Golden Hour</option>
+                                    <option value="high-contrast spotlight from above, volumetric haze">Spotlight</option>
+                                    <option value="neon-lit environment, pink and blue neon reflections">Neon Cyberpunk</option>
+                                    <option value="soft natural light, even and flattering">Soft Natural</option>
+                                    <option value="backlit silhouette edge light, face illuminated by screen glow">Backlit Screen</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#ff6b35;">Color Grade</label>
+                                <select class="style-select" id="ab_b_color" onchange="generateABMerge('B')">
+                                    <option value="teal and warm amber tones, cinematic grade">Teal + Amber</option>
+                                    <option value="cool blue dominant, desaturated highlights">Cool Blue</option>
+                                    <option value="warm golden tones with green accents">Warm Gold</option>
+                                    <option value="high contrast with selective color pop">B&W + Pop</option>
+                                    <option value="neon pink and electric blue, cyberpunk palette">Neon Pop</option>
+                                    <option value="muted earth tones, film emulation">Muted Film</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="prompt-box" id="ab_b_step3Prompt" style="border-color:#ff6b35;margin-top:10px;">Describe scene and pick lighting/color...</div>
+                        <div class="btn-row" style="margin-top:8px;">
+                            <button class="btn" onclick="generateABMerge('B')" style="background:#ff6b35;color:#fff;">Generate Merge</button>
+                            <button class="btn" onclick="copyABPrompt('B','step3')" style="background:#ff6b35;color:#fff;">Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VARIATION C -->
+                <div id="abPanelC" style="display:none;">
+                    <!-- C Step 1 -->
+                    <div style="border:2px solid #10b981;border-radius:10px;padding:14px;background:#111;margin-bottom:12px;">
+                        <label style="font-size:13px;font-weight:700;color:#10b981;display:block;margin-bottom:8px;">
+                            <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:6px;">C1</span> Character Prompt (Higgsfield)
+                        </label>
+                        <textarea id="ab_c_subjectDesc" rows="2" placeholder="Yet another subject variation — try a completely different angle or expression..."
+                            style="width:100%;padding:10px;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#ccc;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+                            oninput="generateABPrompt('C')" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#333'"></textarea>
+                        <div style="margin-top:8px;">
+                            <label style="font-size:11px;color:#10b981;">Mood</label>
+                            <div class="style-grid" id="ab_c_moodGrid" style="margin-top:4px;">
+                                <div class="style-option active" data-val="focused and confident" onclick="pickABStyle(this,'C')">Focused</div>
+                                <div class="style-option" data-val="shocked and amazed, eyes wide" onclick="pickABStyle(this,'C')">Shocked</div>
+                                <div class="style-option" data-val="serious and intense, slight frown" onclick="pickABStyle(this,'C')">Intense</div>
+                                <div class="style-option" data-val="smiling warmly, approachable" onclick="pickABStyle(this,'C')">Friendly</div>
+                                <div class="style-option" data-val="curious, head slightly tilted" onclick="pickABStyle(this,'C')">Curious</div>
+                                <div class="style-option" data-val="powerful and commanding" onclick="pickABStyle(this,'C')">Powerful</div>
+                            </div>
+                        </div>
+                        <div class="prompt-box" id="ab_c_step1Prompt" style="border-color:#10b981;margin-top:10px;">Set mood and describe subject...</div>
+                        <div class="btn-row" style="margin-top:8px;">
+                            <button class="btn" onclick="generateABPrompt('C')" style="background:#10b981;color:#fff;">Generate</button>
+                            <button class="btn" onclick="copyABPrompt('C','step1')" style="background:#10b981;color:#fff;">Copy</button>
+                            <button class="btn btn-secondary" onclick="shuffleABPose('C')">Shuffle Pose</button>
+                        </div>
+                    </div>
+                    <!-- C Step 2 -->
+                    <div style="border:2px solid #6C3AED;border-radius:10px;padding:14px;background:#111;margin-bottom:12px;">
+                        <label style="font-size:13px;font-weight:700;color:#6C3AED;display:block;margin-bottom:8px;">
+                            <span style="background:#6C3AED;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:6px;">C2</span> Download Character
+                        </label>
+                        <div class="face-upload" id="ab_c_charUpload" onclick="document.getElementById('ab_c_charInput').click()" style="aspect-ratio:16/9;border-color:#6C3AED;">
+                            <div class="upload-text"><strong style="color:#6C3AED;">Drop Variation C character here</strong><br><span style="font-size:11px;color:#555">Generated from C1 prompt in Higgsfield</span></div>
+                        </div>
+                        <input type="file" id="ab_c_charInput" accept="image/*,.heic,.heif" style="display:none" onchange="handleABCharUpload(event,'C')">
+                    </div>
+                    <!-- C Step 3 -->
+                    <div style="border:2px solid #ff6b35;border-radius:10px;padding:14px;background:#111;">
+                        <label style="font-size:13px;font-weight:700;color:#ff6b35;display:block;margin-bottom:8px;">
+                            <span style="background:#ff6b35;color:#fff;padding:2px 8px;border-radius:4px;font-weight:800;margin-right:6px;">C3</span> Nano Banana Merge
+                        </label>
+                        <textarea id="ab_c_sceneDesc" rows="2" placeholder="Third scene variation — completely different vibe, colors, elements..."
+                            style="width:100%;padding:10px;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#ccc;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+                            oninput="generateABMerge('C')" onfocus="this.style.borderColor='#ff6b35'" onblur="this.style.borderColor='#333'"></textarea>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                            <div>
+                                <label style="font-size:11px;color:#ff6b35;">Lighting</label>
+                                <select class="style-select" id="ab_c_lighting" onchange="generateABMerge('C')">
+                                    <option value="cinematic rim lighting with blue-teal glow from monitors, warm amber key light">Tech Glow</option>
+                                    <option value="dramatic side lighting with deep shadows, single motivated light source">Dramatic Side</option>
+                                    <option value="golden hour warm light, soft diffused fill">Golden Hour</option>
+                                    <option value="high-contrast spotlight from above, volumetric haze">Spotlight</option>
+                                    <option value="neon-lit environment, pink and blue neon reflections">Neon Cyberpunk</option>
+                                    <option value="soft natural light, even and flattering">Soft Natural</option>
+                                    <option value="backlit silhouette edge light, face illuminated by screen glow">Backlit Screen</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#ff6b35;">Color Grade</label>
+                                <select class="style-select" id="ab_c_color" onchange="generateABMerge('C')">
+                                    <option value="teal and warm amber tones, cinematic grade">Teal + Amber</option>
+                                    <option value="cool blue dominant, desaturated highlights">Cool Blue</option>
+                                    <option value="warm golden tones with green accents">Warm Gold</option>
+                                    <option value="high contrast with selective color pop">B&W + Pop</option>
+                                    <option value="neon pink and electric blue, cyberpunk palette">Neon Pop</option>
+                                    <option value="muted earth tones, film emulation">Muted Film</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="prompt-box" id="ab_c_step3Prompt" style="border-color:#ff6b35;margin-top:10px;">Describe scene and pick lighting/color...</div>
+                        <div class="btn-row" style="margin-top:8px;">
+                            <button class="btn" onclick="generateABMerge('C')" style="background:#ff6b35;color:#fff;">Generate Merge</button>
+                            <button class="btn" onclick="copyABPrompt('C','step3')" style="background:#ff6b35;color:#fff;">Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /panelAB -->
+
+        </div>
+    </div>
+</div>
+
+<script>
+    let selectedVideo = null;
+    let allResults = [];
+    let displayedCount = 0;
+    const CHUNK_SIZE = 20;
+    let faceImageData = null;
+    let characterImageData = null;
+    let currentPose = 0;
+    let isLoading = false;
+    let currentQuery = '';
+
+    const POSES = [
+        { pose: 'looking directly at camera with slight intensity, shoulders squared', angle: 'subject positioned left third of frame, rule of thirds' },
+        { pose: 'arms crossed confidently, chin slightly raised', angle: 'low angle looking slightly up at subject, power framing' },
+        { pose: 'leaning forward toward camera, one hand on desk', angle: 'eye-level, subject fills right third of frame' },
+        { pose: 'pointing at camera with one hand, direct eye contact', angle: 'centered composition, slightly wide angle' },
+        { pose: 'looking at camera over shoulder, three-quarter turn', angle: 'profile view, subject on left with environment revealed on right' },
+        { pose: 'sitting back in chair, both hands behind head', angle: 'straight-on centered, relaxed power pose' },
+        { pose: 'gesturing with open palm toward floating UI/text space', angle: 'off-center left, leaving room for text overlay on right' },
+        { pose: 'close-up face shot, eyes locked on camera', angle: 'tight crop from chest up, shallow depth of field' },
+    ];
+
+    // ===== SEARCH =====
+    async function searchYouTube() {
+        const query = document.getElementById('searchInput').value.trim();
+        if (!query) return;
+
+        document.getElementById('content').innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                Searching "${query}"...
+            </div>
+        `;
+
+        try {
+            currentQuery = query;
+            isLoading = true;
+            const resp = await fetch(`/api/search?q=${encodeURIComponent(query)}&count=100`);
+            const json = await resp.json();
+            if (!resp.ok) throw new Error(json.error || 'Search failed');
+
+            const data = json.results || [];
+            if (data.length === 0) {
+                document.getElementById('content').innerHTML = `
+                    <div class="empty"><h2>No results found</h2><p>Try a different search term.</p></div>
+                `;
+                isLoading = false;
+                return;
+            }
+
+            allResults = data.map(v => ({
+                videoId: v.videoId,
+                title: v.title,
+                author: v.author,
+                authorUrl: v.authorUrl || '',
+                viewCount: v.viewCount || 0,
+                duration: v.duration || 0,
+                thumbnail: v.thumbnail,
+                viewCountText: v.viewCount ? formatViews(v.viewCount) : '',
+            }));
+
+            displayedCount = 0;
+            document.getElementById('content').innerHTML = `<div class="grid" id="thumbGrid"></div><div id="scrollSentinel" style="height:1px"></div>`;
+            loadMoreChunk();
+            document.getElementById('resultCount').textContent = `${allResults.length} thumbnails`;
+            isLoading = false;
+
+        } catch (err) {
+            isLoading = false;
+            document.getElementById('content').innerHTML = `
+                <div class="empty">
+                    <h2>Search failed</h2>
+                    <p>${err.message}</p>
+                    <p style="color:#888;margin-top:8px;">Make sure server.py is running: <code style="color:#c8ff00">python3 server.py</code></p>
+                </div>
+            `;
+        }
+    }
+
+    function formatViews(n) {
+        if (n >= 1_000_000) return `${(n/1_000_000).toFixed(1)}M views`;
+        if (n >= 1_000) return `${(n/1_000).toFixed(0)}K views`;
+        return `${n} views`;
+    }
+
+    function loadMoreChunk() {
+        const grid = document.getElementById('thumbGrid');
+        if (!grid || displayedCount >= allResults.length) return;
+
+        const chunk = allResults.slice(displayedCount, displayedCount + CHUNK_SIZE);
+        const html = chunk.map(v => `
+            <div class="card" onclick="selectVideo('${v.videoId}')" id="card-${v.videoId}">
+                <img src="${v.thumbnail}" alt="${esc(v.title)}" loading="lazy"
+                     onerror="this.src='https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg'">
+                <div class="card-info">
+                    <div class="card-title">${esc(v.title)}</div>
+                    <div class="card-channel">${esc(v.author)} ${v.viewCountText ? '· ' + v.viewCountText : ''}</div>
+                </div>
+            </div>
+        `).join('');
+
+        grid.insertAdjacentHTML('beforeend', html);
+        displayedCount += chunk.length;
+
+        // Update counter
+        document.getElementById('resultCount').textContent = `${displayedCount} / ${allResults.length} thumbnails`;
+    }
+
+    // Infinite scroll — IntersectionObserver watches the sentinel at the bottom
+    const scrollObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && displayedCount < allResults.length) {
+            loadMoreChunk();
+        }
+    }, { rootMargin: '400px' });
+
+    // Re-attach observer whenever content changes
+    const contentObserver = new MutationObserver(() => {
+        const sentinel = document.getElementById('scrollSentinel');
+        if (sentinel) {
+            scrollObserver.disconnect();
+            scrollObserver.observe(sentinel);
+        }
+    });
+    contentObserver.observe(document.getElementById('content'), { childList: true });
+
+    // ===== SELECT THUMBNAIL =====
+    function selectVideo(videoId) {
+        const video = allResults.find(v => v.videoId === videoId);
+        if (!video) return;
+        selectedVideo = video;
+
+        // Highlight
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+        document.getElementById(`card-${videoId}`)?.classList.add('selected');
+
+        // Fill studio panel
+        document.getElementById('refImage').src = video.thumbnail;
+        document.getElementById('refImage').onerror = function() {
+            this.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+        };
+        document.getElementById('refMeta').innerHTML = `
+            <strong>${esc(video.title)}</strong><br>
+            ${esc(video.author)} · ${video.viewCountText}
+        `;
+
+        // Auto-detect mood from title
+        autoDetectMood(video.title);
+
+        // Generate prompts
+        generatePrompt();
+
+        // Open panel
+        document.getElementById('studioPanel').classList.add('open');
+    }
+
+    function autoDetectMood(title) {
+        const t = title.toLowerCase();
+        if (t.match(/crazy|insane|mind|blow|wtf|shocking/)) setActiveOption('moodGrid', 'shocked and amazed, eyes wide');
+        else if (t.match(/tutorial|how to|guide|learn|course/)) setActiveOption('moodGrid', 'smiling warmly, approachable');
+        else if (t.match(/power|money|earn|income|rich|secret/)) setActiveOption('moodGrid', 'powerful and commanding');
+        else if (t.match(/what|why|question|explain/)) setActiveOption('moodGrid', 'curious, head slightly tilted');
+    }
+
+    function setActiveOption(gridId, value) {
+        const grid = document.getElementById(gridId);
+        grid.querySelectorAll('.style-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.val === value);
+        });
+    }
+
+    // ===== FACE UPLOAD (supports HEIC/HEIF from iPhone) =====
+    function isHeic(file) {
+        const name = file.name.toLowerCase();
+        return name.endsWith('.heic') || name.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif';
+    }
+
+    async function processImage(file) {
+        const upload = document.getElementById('faceUpload');
+
+        if (isHeic(file)) {
+            // Convert HEIC server-side using macOS sips
+            upload.innerHTML = `<div class="upload-text"><strong>Converting HEIC...</strong></div>`;
+            try {
+                const resp = await fetch('/api/convert-heic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body: file,
+                });
+                const json = await resp.json();
+                if (json.jpeg_base64) {
+                    faceImageData = `data:image/jpeg;base64,${json.jpeg_base64}`;
+                    upload.classList.add('has-image');
+                    upload.innerHTML = `<img src="${faceImageData}" alt="Your face">`;
+                } else {
+                    upload.innerHTML = `<div class="upload-text"><strong style="color:#ff4444">HEIC conversion failed</strong></div>`;
+                }
+            } catch (e) {
+                upload.innerHTML = `<div class="upload-text"><strong style="color:#ff4444">Error: ${e.message}</strong></div>`;
+            }
+        } else {
+            // Normal image — read directly
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                faceImageData = e.target.result;
+                upload.classList.add('has-image');
+                upload.innerHTML = `<img src="${faceImageData}" alt="Your face">`;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function handleFaceUpload(event) {
+        const file = event.target.files[0];
+        if (file) processImage(file);
+    }
+
+    // Drag & drop
+    const faceUpload = document.getElementById('faceUpload');
+    faceUpload.addEventListener('dragover', (e) => { e.preventDefault(); faceUpload.style.borderColor = '#c8ff00'; });
+    faceUpload.addEventListener('dragleave', () => { faceUpload.style.borderColor = '#444'; });
+    faceUpload.addEventListener('drop', (e) => {
+        e.preventDefault();
+        faceUpload.style.borderColor = '#444';
+        const file = e.dataTransfer.files[0];
+        if (file) processImage(file);
+    });
+
+    // ===== STYLE PICKERS =====
+    function pickStyle(el, type) {
+        const gridId = type === 'mood' ? 'moodGrid' : 'moodGrid';
+        el.closest('.style-grid').querySelectorAll('.style-option').forEach(o => o.classList.remove('active'));
+        el.classList.add('active');
+        generatePrompt();
+    }
+
+    function getActive(gridId) {
+        const active = document.getElementById(gridId).querySelector('.style-option.active');
+        return active ? active.dataset.val : '';
+    }
+
+    // ===== STEP 1: CHARACTER-ONLY PROMPT (Higgsfield) =====
+    function generatePrompt() {
+        if (!selectedVideo) return;
+
+        const useSoul = document.getElementById('useSoulId').checked;
+        const mood = getActive('moodGrid');
+        const poseData = POSES[currentPose % POSES.length];
+        const subjectDesc = document.getElementById('subjectDescription').value.trim();
+
+        const parts = [];
+
+        // 1. SUBJECT — who you are
+        if (useSoul) {
+            parts.push(`A young Somali man wearing glasses`);
+        } else {
+            parts.push(`A young man wearing glasses`);
+        }
+
+        // 2. SUBJECT DESCRIPTION — what the reference person is doing
+        if (subjectDesc) {
+            parts.push(subjectDesc);
+        }
+
+        // 3. POSE + EXPRESSION
+        parts.push(`${poseData.pose}, ${mood} expression`);
+
+        // 4. COMPOSITION ANGLE
+        parts.push(poseData.angle);
+
+        // 5. CLEAN BACKGROUND — Higgsfield only needs the character
+        parts.push(`Clean neutral dark background, no distracting elements`);
+
+        // 6. QUALITY
+        parts.push(`Ultra-detailed skin texture, photorealistic, 35mm photography aesthetic, sharp focus on face`);
+
+        const prompt = parts.join('. ') + '.';
+
+        document.getElementById('promptOutput').innerHTML = prompt;
+        document.getElementById('promptOutput').dataset.raw = prompt;
+
+        // Also update merge prompt
+        generateMergePrompt();
+    }
+
+    function regeneratePrompt() {
+        currentPose = (currentPose + 1) % POSES.length;
+        generatePrompt();
+    }
+
+    // ===== ACTIONS =====
+    function copyPrompt() {
+        const text = document.getElementById('promptOutput').dataset.raw ||
+                     document.getElementById('promptOutput').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#4CAF50';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    function copyWithMeta() {
+        const prompt = document.getElementById('promptOutput').dataset.raw ||
+                       document.getElementById('promptOutput').textContent;
+        const styleId = document.getElementById('hfStyleSelect').value;
+        const styleName = document.getElementById('hfStyleSelect').selectedOptions[0]?.text || '';
+        const useSoul = document.getElementById('useSoulId').checked;
+        const topic = document.getElementById('videoTopic').value.trim();
+
+        const meta = [
+            `PROMPT: ${prompt}`,
+            ``,
+            `VIDEO TOPIC: ${topic || '(not set)'}`,
+            `REFERENCE: ${selectedVideo?.title || ''} by ${selectedVideo?.author || ''}`,
+            `  Thumbnail: https://i.ytimg.com/vi/${selectedVideo?.videoId}/maxresdefault.jpg`,
+            `  YouTube: https://www.youtube.com/watch?v=${selectedVideo?.videoId}`,
+            ``,
+            `HIGGSFIELD SETTINGS:`,
+            `  style_id: ${styleId} (${styleName})`,
+            `  style_strength: 1.0`,
+            `  quality: 1080p`,
+            `  width_and_height: 1696x960`,
+            `  enhance_prompt: true`,
+            `  batch_size: 4`,
+            useSoul ? `  custom_reference_id: <your_soul_id>` : '',
+            useSoul ? `  custom_reference_strength: 1.0` : '',
+            faceImageData ? `  image_reference_url: <upload_your_face_image>` : '',
+        ].filter(Boolean).join('\n');
+
+        navigator.clipboard.writeText(meta).then(() => {
+            const btn = event.target;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#4CAF50';
+            setTimeout(() => { btn.textContent = 'Copy All (Prompt + Settings)'; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    function downloadRef() {
+        if (!selectedVideo) return;
+        // Use server proxy for clean download
+        const a = document.createElement('a');
+        a.href = `/api/download?id=${selectedVideo.videoId}`;
+        a.download = `ref_${selectedVideo.videoId}.jpg`;
+        a.click();
+    }
+
+    function openOnYouTube() {
+        if (!selectedVideo) return;
+        window.open(`https://www.youtube.com/watch?v=${selectedVideo.videoId}`, '_blank');
+    }
+
+    function closeStudio() {
+        document.getElementById('studioPanel').classList.remove('open');
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+        selectedVideo = null;
+    }
+
+    function quickSearch(term) {
+        document.getElementById('searchInput').value = term;
+        searchYouTube();
+    }
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+
+    // Enter key
+    document.getElementById('searchInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') searchYouTube();
+    });
+
+    // Re-generate when soul toggle changes
+    document.getElementById('useSoulId').addEventListener('change', generatePrompt);
+
+    // ===== STEP 2: CHARACTER UPLOAD =====
+    let characterUploadEl = document.getElementById('characterUpload');
+
+    async function handleCharacterUpload(event) {
+        const file = event.target.files[0];
+        if (file) processCharacterImage(file);
+    }
+
+    async function processCharacterImage(file) {
+        const upload = document.getElementById('characterUpload');
+
+        if (isHeic(file)) {
+            upload.innerHTML = `<div class="upload-text"><strong style="color:#6C3AED;">Converting HEIC...</strong></div>`;
+            try {
+                const resp = await fetch('/api/convert-heic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body: file,
+                });
+                const json = await resp.json();
+                if (json.jpeg_base64) {
+                    characterImageData = `data:image/jpeg;base64,${json.jpeg_base64}`;
+                    upload.classList.add('has-image');
+                    upload.innerHTML = `<img src="${characterImageData}" alt="Your character">`;
+                    generateMergePrompt();
+                }
+            } catch (e) {
+                upload.innerHTML = `<div class="upload-text"><strong style="color:#ff4444">Error: ${e.message}</strong></div>`;
+            }
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                characterImageData = e.target.result;
+                upload.classList.add('has-image');
+                upload.innerHTML = `<img src="${characterImageData}" alt="Your character">`;
+                generateMergePrompt();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    characterUploadEl.addEventListener('dragover', (e) => { e.preventDefault(); characterUploadEl.style.borderColor = '#6C3AED'; });
+    characterUploadEl.addEventListener('dragleave', () => { characterUploadEl.style.borderColor = '#333'; });
+    characterUploadEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        characterUploadEl.style.borderColor = '#333';
+        const file = e.dataTransfer.files[0];
+        if (file) processCharacterImage(file);
+    });
+
+    // ===== STEP 3: FULL SCENE MERGE PROMPT (Nano Banana) =====
+    function generateMergePrompt() {
+        if (!selectedVideo) return;
+
+        const topic = document.getElementById('videoTopic').value.trim() || selectedVideo.title;
+        const sceneDesc = document.getElementById('sceneDescription').value.trim();
+        const lighting = document.getElementById('lightingSelect').value;
+        const colorGrade = document.getElementById('colorSelect').value;
+        const hasCharacter = !!characterImageData;
+
+        const parts = [];
+
+        // INSTRUCTION
+        parts.push(`I'm giving you two images: a reference thumbnail and my character.`);
+        parts.push(`Recreate this thumbnail with my character replacing the original person.`);
+
+        // SCENE — the full background/environment from the reference
+        if (sceneDesc) {
+            parts.push(`The scene: ${sceneDesc}.`);
+        }
+
+        // TOPIC
+        parts.push(`The video topic is "${topic}" — adapt any text overlays or visual elements to match this topic.`);
+
+        // SUBJECT PLACEMENT
+        parts.push(`Place my character in the EXACT same position, pose, and framing as the person in the reference.`);
+        parts.push(`Keep my character's face clearly visible and recognizable. He wears glasses — always keep them.`);
+
+        // LIGHTING (Pillar 1)
+        parts.push(`Lighting: ${lighting}.`);
+
+        // COLOR (Pillar 4)
+        parts.push(`Color grade: ${colorGrade}.`);
+
+        // DEPTH (Pillar 3)
+        parts.push(`Depth: foreground elements slightly blurred, character tack-sharp in midground, background with soft bokeh.`);
+
+        // COMPOSITION (Pillar 2)
+        parts.push(`Keep the reference thumbnail's exact composition and layout.`);
+
+        // OUTPUT
+        parts.push(`Professional YouTube thumbnail quality — cinematic, high contrast, eye-catching at small sizes. 1280x720 resolution.`);
+
+        const prompt = parts.join(' ');
+
+        if (!hasCharacter && !sceneDesc) {
+            document.getElementById('mergePromptOutput').innerHTML =
+                '<span style="color:#ff6b35;">Describe the scene above and upload your character from Step 2.</span>\n' +
+                '<span style="color:#666;">You\'ll feed Nano Banana: reference thumbnail + character image + this prompt.</span>';
+        } else {
+            document.getElementById('mergePromptOutput').innerHTML = prompt;
+        }
+        document.getElementById('mergePromptOutput').dataset.raw = prompt;
+    }
+
+    function copyMergePrompt() {
+        const text = document.getElementById('mergePromptOutput').dataset.raw ||
+                     document.getElementById('mergePromptOutput').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#4CAF50';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    // ===== STUDIO TAB SWITCHER (Primary / A/B Test) =====
+    function switchStudioTab(tab) {
+        const primary = document.getElementById('panelPrimary');
+        const ab = document.getElementById('panelAB');
+        const tabP = document.getElementById('tabPrimary');
+        const tabAB = document.getElementById('tabAB');
+
+        if (tab === 'primary') {
+            primary.style.display = 'block';
+            ab.style.display = 'none';
+            tabP.style.background = '#c8ff00';
+            tabP.style.color = '#000';
+            tabP.style.borderColor = '#c8ff00';
+            tabAB.style.background = '#1a1a1a';
+            tabAB.style.color = '#666';
+            tabAB.style.borderColor = '#444';
+        } else {
+            primary.style.display = 'none';
+            ab.style.display = 'block';
+            tabAB.style.background = '#e74c3c';
+            tabAB.style.color = '#fff';
+            tabAB.style.borderColor = '#e74c3c';
+            tabP.style.background = '#1a1a1a';
+            tabP.style.color = '#666';
+            tabP.style.borderColor = '#444';
+        }
+    }
+
+    // ===== A/B TEST — TWO EXTRA THUMBNAILS =====
+    let abPoseB = 2, abPoseC = 4; // different starting poses
+    let abCharDataB = null, abCharDataC = null;
+
+    function switchABTab(tab) {
+        document.getElementById('abPanelB').style.display = tab === 'B' ? 'block' : 'none';
+        document.getElementById('abPanelC').style.display = tab === 'C' ? 'block' : 'none';
+        document.getElementById('abTabB').style.background = tab === 'B' ? '#3b82f6' : '#222';
+        document.getElementById('abTabB').style.color = tab === 'B' ? '#fff' : '#888';
+        document.getElementById('abTabB').style.border = tab === 'B' ? 'none' : '1px solid #333';
+        document.getElementById('abTabC').style.background = tab === 'C' ? '#10b981' : '#222';
+        document.getElementById('abTabC').style.color = tab === 'C' ? '#fff' : '#888';
+        document.getElementById('abTabC').style.border = tab === 'C' ? 'none' : '1px solid #333';
+    }
+
+    function getABMood(variant) {
+        const grid = document.getElementById(`ab_${variant.toLowerCase()}_moodGrid`);
+        const active = grid.querySelector('.style-option.active');
+        return active ? active.dataset.val : 'focused and confident';
+    }
+
+    function pickABStyle(el, variant) {
+        el.closest('.style-grid').querySelectorAll('.style-option').forEach(o => o.classList.remove('active'));
+        el.classList.add('active');
+        generateABPrompt(variant);
+    }
+
+    function shuffleABPose(variant) {
+        if (variant === 'B') { abPoseB = (abPoseB + 1) % POSES.length; }
+        else { abPoseC = (abPoseC + 1) % POSES.length; }
+        generateABPrompt(variant);
+    }
+
+    function generateABPrompt(variant) {
+        if (!selectedVideo) return;
+        const v = variant.toLowerCase();
+        const useSoul = document.getElementById('useSoulId').checked;
+        const mood = getABMood(variant);
+        const poseData = POSES[variant === 'B' ? abPoseB % POSES.length : abPoseC % POSES.length];
+        const subjectDesc = document.getElementById(`ab_${v}_subjectDesc`).value.trim();
+
+        const parts = [];
+        if (useSoul) { parts.push('A young Somali man wearing glasses'); }
+        else { parts.push('A young man wearing glasses'); }
+        if (subjectDesc) { parts.push(subjectDesc); }
+        parts.push(`${poseData.pose}, ${mood} expression`);
+        parts.push(poseData.angle);
+        parts.push('Clean neutral dark background, no distracting elements');
+        parts.push('Ultra-detailed skin texture, photorealistic, 35mm photography aesthetic, sharp focus on face');
+
+        const prompt = parts.join('. ') + '.';
+        const el = document.getElementById(`ab_${v}_step1Prompt`);
+        el.innerHTML = prompt;
+        el.dataset.raw = prompt;
+
+        // Also update merge prompt
+        generateABMerge(variant);
+    }
+
+    function generateABMerge(variant) {
+        if (!selectedVideo) return;
+        const v = variant.toLowerCase();
+        const topic = document.getElementById('videoTopic').value.trim() || selectedVideo.title;
+        const sceneDesc = document.getElementById(`ab_${v}_sceneDesc`).value.trim();
+        const lighting = document.getElementById(`ab_${v}_lighting`).value;
+        const colorGrade = document.getElementById(`ab_${v}_color`).value;
+
+        const parts = [];
+        parts.push("I'm giving you two images: a reference thumbnail and my character.");
+        parts.push('Recreate this thumbnail with my character replacing the original person.');
+        if (sceneDesc) { parts.push(`The scene: ${sceneDesc}.`); }
+        parts.push(`The video topic is "${topic}" — adapt any text overlays or visual elements to match this topic.`);
+        parts.push('Place my character in the EXACT same position, pose, and framing as the person in the reference.');
+        parts.push("Keep my character's face clearly visible and recognizable. He wears glasses — always keep them.");
+        parts.push(`Lighting: ${lighting}.`);
+        parts.push(`Color grade: ${colorGrade}.`);
+        parts.push('Depth: foreground elements slightly blurred, character tack-sharp in midground, background with soft bokeh.');
+        parts.push("Keep the reference thumbnail's exact composition and layout.");
+        parts.push('Professional YouTube thumbnail quality — cinematic, high contrast, eye-catching at small sizes. 1280x720 resolution.');
+
+        const prompt = parts.join(' ');
+        const el = document.getElementById(`ab_${v}_step3Prompt`);
+        if (!sceneDesc) {
+            el.innerHTML = '<span style="color:#ff6b35;">Describe the scene above...</span>';
+        } else {
+            el.innerHTML = prompt;
+        }
+        el.dataset.raw = prompt;
+    }
+
+    function copyABPrompt(variant, step) {
+        const v = variant.toLowerCase();
+        const el = document.getElementById(`ab_${v}_${step}Prompt`);
+        const text = el.dataset.raw || el.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#4CAF50';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    async function handleABCharUpload(event, variant) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const v = variant.toLowerCase();
+        const upload = document.getElementById(`ab_${v}_charUpload`);
+
+        if (isHeic(file)) {
+            upload.innerHTML = '<div class="upload-text"><strong style="color:#6C3AED;">Converting HEIC...</strong></div>';
+            try {
+                const resp = await fetch('/api/convert-heic', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+                const json = await resp.json();
+                if (json.jpeg_base64) {
+                    const data = `data:image/jpeg;base64,${json.jpeg_base64}`;
+                    if (variant === 'B') abCharDataB = data; else abCharDataC = data;
+                    upload.classList.add('has-image');
+                    upload.innerHTML = `<img src="${data}" alt="Character ${variant}">`;
+                }
+            } catch (e) {
+                upload.innerHTML = `<div class="upload-text"><strong style="color:#ff4444">Error: ${e.message}</strong></div>`;
+            }
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = e.target.result;
+                if (variant === 'B') abCharDataB = data; else abCharDataC = data;
+                upload.classList.add('has-image');
+                upload.innerHTML = `<img src="${data}" alt="Character ${variant}">`;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // Drag & drop for AB character uploads
+    ['B', 'C'].forEach(variant => {
+        const v = variant.toLowerCase();
+        const el = document.getElementById(`ab_${v}_charUpload`);
+        el.addEventListener('dragover', (e) => { e.preventDefault(); el.style.borderColor = '#6C3AED'; });
+        el.addEventListener('dragleave', () => { el.style.borderColor = '#333'; });
+        el.addEventListener('drop', (e) => {
+            e.preventDefault();
+            el.style.borderColor = '#333';
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                // Simulate file input
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                document.getElementById(`ab_${v}_charInput`).files = dt.files;
+                handleABCharUpload({ target: { files: [file] } }, variant);
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
