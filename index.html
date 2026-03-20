@@ -438,7 +438,7 @@
 <div class="header">
     <div class="logo">Thumbnail Studio</div>
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search YouTube thumbnails... (e.g. AI agents, Claude Code, automation)" autofocus>
+        <input type="text" id="searchInput" placeholder="Search or paste YouTube URL (e.g. https://youtube.com/watch?v=...)" autofocus>
         <button onclick="searchYouTube()">Search</button>
     </div>
     <div class="result-count" id="resultCount"></div>
@@ -872,30 +872,34 @@
                 if (!resp.ok) throw new Error(json.error || 'Search failed');
                 data = json.results || [];
             } else {
-                // Public: use Invidious API via CORS proxy
-                const invApi = 'https://inv.nadeko.net/api/v1/search?q=' + encodeURIComponent(query) + '&type=video&sort_by=relevance';
-                const proxies = [
-                    url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-                    url => 'https://corsproxy.io/?' + encodeURIComponent(url),
-                ];
-                let fetched = false;
-                for (const makeUrl of proxies) {
-                    try {
-                        const r = await fetch(makeUrl(invApi), {signal: AbortSignal.timeout(12000)});
-                        const results = await r.json();
-                        data = results.filter(v => v.type === 'video' && v.videoId).slice(0, 60).map(v => ({
-                            videoId: v.videoId,
-                            title: v.title || '',
-                            author: v.author || '',
-                            viewCount: v.viewCount || 0,
-                            duration: v.lengthSeconds || 0,
-                            thumbnail: `https://i.ytimg.com/vi/${v.videoId}/maxresdefault.jpg`,
-                        }));
-                        fetched = true;
-                        break;
-                    } catch (_e) { continue; }
+                // Public mode: extract video ID from URL or search term
+                // Supports: youtube.com/watch?v=ID, youtu.be/ID, or bare video ID
+                const vidMatch = query.match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/);
+                const bareId = query.match(/^[\w-]{11}$/);
+                const videoId = vidMatch ? vidMatch[1] : (bareId ? bareId[0] : null);
+
+                if (videoId) {
+                    data = [{
+                        videoId: videoId,
+                        title: 'YouTube Video',
+                        author: '',
+                        viewCount: 0,
+                        duration: 0,
+                        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                    }];
+                } else {
+                    // No backend: show helpful message
+                    document.getElementById('content').innerHTML = `
+                        <div class="empty">
+                            <h2>Paste a YouTube URL to grab its thumbnail</h2>
+                            <p style="color:#999;margin-top:12px;">On the public version, paste a video URL like:</p>
+                            <p style="color:#c8ff00;margin-top:8px;font-family:monospace;">https://youtube.com/watch?v=dQw4w9WgXcQ</p>
+                            <p style="color:#999;margin-top:12px;">For full search, run locally: <code style="color:#c8ff00;">python3 server.py</code></p>
+                        </div>
+                    `;
+                    isLoading = false;
+                    return;
                 }
-                if (!fetched) throw new Error('Search unavailable — try again or run locally with server.py');
             }
             if (data.length === 0) {
                 document.getElementById('content').innerHTML = `
