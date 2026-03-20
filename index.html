@@ -861,11 +861,40 @@
         try {
             currentQuery = query;
             isLoading = true;
-            const resp = await fetch(`/api/search?q=${encodeURIComponent(query)}&count=100`);
-            const json = await resp.json();
-            if (!resp.ok) throw new Error(json.error || 'Search failed');
 
-            const data = json.results || [];
+            let data = [];
+            // Try local server first, fall back to Invidious API for public deployment
+            try {
+                const resp = await fetch(`/api/search?q=${encodeURIComponent(query)}&count=100`);
+                const json = await resp.json();
+                if (!resp.ok) throw new Error('local server error');
+                data = json.results || [];
+            } catch (_localErr) {
+                // Fallback: Invidious public API (no key needed)
+                const invApis = [
+                    'https://inv.nadeko.net',
+                    'https://invidious.nerdvpn.de',
+                    'https://invidious.jing.rocks'
+                ];
+                let fetched = false;
+                for (const api of invApis) {
+                    try {
+                        const r = await fetch(`${api}/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance`, {signal: AbortSignal.timeout(8000)});
+                        const results = await r.json();
+                        data = results.filter(v => v.type === 'video').slice(0, 60).map(v => ({
+                            videoId: v.videoId,
+                            title: v.title,
+                            author: v.author,
+                            viewCount: v.viewCount || 0,
+                            duration: v.lengthSeconds || 0,
+                            thumbnail: `https://i.ytimg.com/vi/${v.videoId}/maxresdefault.jpg`,
+                        }));
+                        fetched = true;
+                        break;
+                    } catch (_e) { continue; }
+                }
+                if (!fetched) throw new Error('Search unavailable — try running server.py locally');
+            }
             if (data.length === 0) {
                 document.getElementById('content').innerHTML = `
                     <div class="empty"><h2>No results found</h2><p>Try a different search term.</p></div>
