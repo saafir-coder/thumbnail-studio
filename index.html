@@ -872,34 +872,30 @@
                 if (!resp.ok) throw new Error(json.error || 'Search failed');
                 data = json.results || [];
             } else {
-                // Public: use Piped API (CORS-friendly YouTube frontend)
-                const pipedApis = [
-                    'https://pipedapi.kavin.rocks',
-                    'https://pipedapi.adminforge.de',
-                    'https://api.piped.projectsegfault.com'
+                // Public: use Invidious API via CORS proxy
+                const invApi = 'https://inv.nadeko.net/api/v1/search?q=' + encodeURIComponent(query) + '&type=video&sort_by=relevance';
+                const proxies = [
+                    url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+                    url => 'https://corsproxy.io/?' + encodeURIComponent(url),
                 ];
                 let fetched = false;
-                for (const api of pipedApis) {
+                for (const makeUrl of proxies) {
                     try {
-                        const r = await fetch(`${api}/search?q=${encodeURIComponent(query)}&filter=videos`, {signal: AbortSignal.timeout(10000)});
-                        const json = await r.json();
-                        const items = json.items || json.relatedStreams || [];
-                        data = items.filter(v => v.url || v.videoId).slice(0, 60).map(v => {
-                            const vid = v.url ? v.url.replace('/watch?v=', '') : v.videoId;
-                            return {
-                                videoId: vid,
-                                title: v.title || '',
-                                author: v.uploaderName || v.author || '',
-                                viewCount: v.views || 0,
-                                duration: v.duration || 0,
-                                thumbnail: `https://i.ytimg.com/vi/${vid}/maxresdefault.jpg`,
-                            };
-                        });
+                        const r = await fetch(makeUrl(invApi), {signal: AbortSignal.timeout(12000)});
+                        const results = await r.json();
+                        data = results.filter(v => v.type === 'video' && v.videoId).slice(0, 60).map(v => ({
+                            videoId: v.videoId,
+                            title: v.title || '',
+                            author: v.author || '',
+                            viewCount: v.viewCount || 0,
+                            duration: v.lengthSeconds || 0,
+                            thumbnail: `https://i.ytimg.com/vi/${v.videoId}/maxresdefault.jpg`,
+                        }));
                         fetched = true;
                         break;
                     } catch (_e) { continue; }
                 }
-                if (!fetched) throw new Error('Search unavailable — all public APIs failed. Try again or run locally with server.py');
+                if (!fetched) throw new Error('Search unavailable — try again or run locally with server.py');
             }
             if (data.length === 0) {
                 document.getElementById('content').innerHTML = `
